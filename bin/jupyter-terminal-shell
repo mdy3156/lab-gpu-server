@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+USER_VENV="${LAB_SERVER_USER_VENV:-${HOME}/.venvs/jupyter-default}"
+DEFAULT_LAB_PATH="/opt/lab-server/bin:/opt/lab-server/venv/bin:/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/lib/wsl/lib"
+if [[ -n "${LAB_SERVER_PATH_PREFIX+x}" ]]; then
+  LAB_PATH_PREFIX="${LAB_SERVER_PATH_PREFIX}"
+else
+  LAB_PATH_PREFIX="${DEFAULT_LAB_PATH}"
+fi
+LAB_PATH="${USER_VENV}/bin"
+if [[ -n "${LAB_PATH_PREFIX}" ]]; then
+  LAB_PATH="${LAB_PATH}:${LAB_PATH_PREFIX}"
+fi
+
+export PATH="${LAB_PATH}:${PATH:-}"
+
+REAL_SHELL="${LAB_SERVER_REAL_SHELL:-}"
+if [[ -z "${REAL_SHELL}" && -n "${USER:-}" ]]; then
+  REAL_SHELL="$(getent passwd "${USER}" | cut -d: -f7 || true)"
+fi
+if [[ -z "${REAL_SHELL}" || ! -x "${REAL_SHELL}" ]]; then
+  REAL_SHELL="/bin/bash"
+fi
+
+case "$(basename "${REAL_SHELL}")" in
+  zsh)
+    LAB_ZDOTDIR="${HOME}/.config/lab-server/zsh"
+    mkdir -p "${LAB_ZDOTDIR}"
+    cat > "${LAB_ZDOTDIR}/.zshrc" <<'EOF'
+# Powerlevel10k's instant prompt warns when startup files print output. Jupyter
+# terminals run through this generated rc file, so keep that warning quiet here
+# while preserving the user's normal ~/.zshrc behavior.
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
+
+# Keep completion cache scoped to the lab terminal wrapper. This avoids stale
+# completion dump entries from the user's regular shell, such as references to
+# removed vendor completions.
+export ZSH_COMPDUMP="${ZDOTDIR:-${HOME}}/.zcompdump-lab-${HOST:-host}-${ZSH_VERSION:-zsh}"
+
+if [[ -f "${HOME}/.zshrc" ]]; then
+  source "${HOME}/.zshrc"
+fi
+
+_lab_user_venv="${LAB_SERVER_USER_VENV:-${HOME}/.venvs/jupyter-default}"
+if [[ -n "${LAB_SERVER_PATH_PREFIX+x}" ]]; then
+  _lab_path_prefix="${LAB_SERVER_PATH_PREFIX}"
+else
+  _lab_path_prefix="/opt/lab-server/bin:/opt/lab-server/venv/bin:/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/lib/wsl/lib"
+fi
+if [[ -n "${_lab_path_prefix}" ]]; then
+  export PATH="${_lab_user_venv}/bin:${_lab_path_prefix}:${PATH:-}"
+else
+  export PATH="${_lab_user_venv}/bin:${PATH:-}"
+fi
+unset _lab_user_venv
+unset _lab_path_prefix
+EOF
+    export ZDOTDIR="${LAB_ZDOTDIR}"
+    exec "${REAL_SHELL}" -i "$@"
+    ;;
+  bash)
+    LAB_BASHRC="${HOME}/.config/lab-server/bashrc"
+    mkdir -p "$(dirname "${LAB_BASHRC}")"
+    cat > "${LAB_BASHRC}" <<'EOF'
+if [[ -f "${HOME}/.bashrc" ]]; then
+  source "${HOME}/.bashrc"
+fi
+
+_lab_user_venv="${LAB_SERVER_USER_VENV:-${HOME}/.venvs/jupyter-default}"
+if [[ -n "${LAB_SERVER_PATH_PREFIX+x}" ]]; then
+  _lab_path_prefix="${LAB_SERVER_PATH_PREFIX}"
+else
+  _lab_path_prefix="/opt/lab-server/bin:/opt/lab-server/venv/bin:/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/lib/wsl/lib"
+fi
+if [[ -n "${_lab_path_prefix}" ]]; then
+  export PATH="${_lab_user_venv}/bin:${_lab_path_prefix}:${PATH:-}"
+else
+  export PATH="${_lab_user_venv}/bin:${PATH:-}"
+fi
+unset _lab_user_venv
+unset _lab_path_prefix
+EOF
+    exec "${REAL_SHELL}" --rcfile "${LAB_BASHRC}" -i "$@"
+    ;;
+  *)
+    exec "${REAL_SHELL}" "$@"
+    ;;
+esac

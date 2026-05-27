@@ -6,6 +6,8 @@ state/*
 *.log
 *.sqlite
 *.sqlite-*
+config/jupyterhub.env
+config/*.local.toml
 __pycache__/
 *.pyc
 jupyterhub_cookie_secret

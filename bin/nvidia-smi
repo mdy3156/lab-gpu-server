@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# JupyterHub/Slurm sessions may not inherit the same PATH as an interactive
+# login shell. Probe the common locations explicitly, including WSL's NVIDIA
+# utility path.
+for candidate in \
+  /usr/bin/nvidia-smi \
+  /usr/local/cuda/bin/nvidia-smi \
+  /usr/lib/wsl/lib/nvidia-smi
+do
+  if [[ -x "${candidate}" ]]; then
+    exec "${candidate}" "$@"
+  fi
+done
+
+cat >&2 <<'EOF'
+nvidia-smi was not found in common locations:
+  /usr/bin/nvidia-smi
+  /usr/local/bin/nvidia-smi
+  /usr/local/cuda/bin/nvidia-smi
+  /usr/lib/wsl/lib/nvidia-smi
+
+Check that the NVIDIA driver utilities are installed on the node where this
+Slurm job is running.
+EOF
+exit 127

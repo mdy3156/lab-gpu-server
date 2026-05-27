@@ -32,6 +32,10 @@ run npm --version
 run command -v configurable-http-proxy
 run configurable-http-proxy --version
 
+section "Nginx"
+run command -v nginx
+run nginx -v
+
 section "GPU"
 run command -v nvidia-smi
 run nvidia-smi

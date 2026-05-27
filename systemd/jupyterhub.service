@@ -8,6 +8,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/lab-server
+EnvironmentFile=-/opt/lab-server/config/jupyterhub.env
 ExecStart=/opt/lab-server/venv/bin/jupyterhub -f /opt/lab-server/config/jupyterhub_config.py
 Restart=on-failure
 RestartSec=5

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LAB_SERVER_HOME="/opt/lab-server"
+LAB_SERVER_PYTHON="${LAB_SERVER_HOME}/venv/bin/python"
+USER_VENV="${LAB_SERVER_USER_VENV:-${HOME}/.venvs/jupyter-default}"
+USER_VENV_PYTHON="${LAB_SERVER_USER_VENV_PYTHON:-/usr/bin/python3}"
+KERNEL_NAME="${LAB_SERVER_USER_KERNEL_NAME:-python3}"
+KERNEL_DISPLAY_NAME="${LAB_SERVER_USER_KERNEL_DISPLAY_NAME:-Python 3 (user venv)}"
+
+if [[ ! -x "${LAB_SERVER_PYTHON}" ]]; then
+  echo "WARN: ${LAB_SERVER_PYTHON} is not executable; skipping user venv bootstrap" >&2
+  exit 0
+fi
+
+if [[ ! -x "${USER_VENV}/bin/python" ]]; then
+  echo "==> Creating user Python venv: ${USER_VENV}" >&2
+  mkdir -p "$(dirname "${USER_VENV}")"
+  if [[ ! -x "${USER_VENV_PYTHON}" ]]; then
+    USER_VENV_PYTHON="$(command -v python3)"
+  fi
+  "${USER_VENV_PYTHON}" -m venv "${USER_VENV}"
+fi
+
+USER_SITE="$("${USER_VENV}/bin/python" - <<'PY'
+import sysconfig
+print(sysconfig.get_paths()["purelib"])
+PY
+)"
+
+LAB_SITE="$("${LAB_SERVER_PYTHON}" - <<'PY'
+import sysconfig
+print(sysconfig.get_paths()["purelib"])
+PY
+)"
+
+mkdir -p "${USER_SITE}"
+
+# Keep the user venv lightweight and offline-friendly. ipykernel and its
+# Jupyter dependencies are provided by the managed lab-server venv as a fallback
+# path, while packages installed into the user venv still take precedence.
+printf '%s\n' "${LAB_SITE}" > "${USER_SITE}/lab-server-kernel-bootstrap.pth"
+
+KERNEL_DIR="${HOME}/.local/share/jupyter/kernels/${KERNEL_NAME}"
+mkdir -p "${KERNEL_DIR}"
+
+"${LAB_SERVER_PYTHON}" - "${KERNEL_DIR}/kernel.json" "${USER_VENV}/bin/python" "${KERNEL_DISPLAY_NAME}" <<'PY'
+import json
+import sys
+
+kernel_json, python_bin, display_name = sys.argv[1:4]
+spec = {
+    "argv": [python_bin, "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+    "display_name": display_name,
+    "language": "python",
+    "metadata": {
+        "debugger": True,
+        "lab_server_managed": True,
+        "lab_server_user_venv": python_bin.rsplit("/bin/python", 1)[0],
+    },
+}
+
+with open(kernel_json, "w", encoding="utf-8") as f:
+    json.dump(spec, f, indent=2)
+    f.write("\n")
+PY
+
+if ! "${USER_VENV}/bin/python" - <<'PY' >/dev/null 2>&1
+import ipykernel
+PY
+then
+  echo "WARN: user venv could not import ipykernel; kernel may not start" >&2
+fi

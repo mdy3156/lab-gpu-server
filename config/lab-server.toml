@@ -1,0 +1,82 @@
+# lab-gpu-server runtime settings.
+#
+# This file is intentionally TOML instead of YAML so the Python config can read
+# it with the standard-library tomllib module on Ubuntu 24.04 / Python 3.12.
+
+[jupyterhub]
+# Keep JupyterHub's public proxy local. Put Nginx HTTPS in front for production.
+bind_url = "http://127.0.0.1:8000"
+
+# Single-node Slurm: localhost is fine.
+# Multi-node Slurm: set these to a private login-node address reachable from
+# compute nodes, for example "http://10.0.0.10:8081".
+hub_bind_url = "http://127.0.0.1:8081"
+hub_connect_url = ""
+
+authenticator_class = "jupyterhub.auth.PAMAuthenticator"
+allow_all = true
+admin_users = ["YOUR_ADMIN_USER"]
+
+default_url = "/lab"
+start_timeout = 600
+http_timeout = 120
+
+[runtime]
+# PATH entries prepended inside Slurm-backed JupyterLab servers and terminals.
+path_entries = [
+  "/opt/lab-server/bin",
+  "/opt/lab-server/venv/bin",
+  "/usr/local/cuda/bin",
+  "/usr/local/bin",
+  "/usr/bin",
+  "/bin",
+  "/usr/sbin",
+  "/sbin",
+  "/usr/lib/wsl/lib",
+]
+
+# BatchSpawner expands {{homedir}} to the Linux user's home directory.
+user_venv = "{{homedir}}/.venvs/jupyter-default"
+user_venv_python = "/usr/bin/python3"
+ensure_user_venv = true
+kernel_name = "python3"
+kernel_display_name = "Python 3 (user venv)"
+terminal_shell_wrapper = "/opt/lab-server/bin/jupyter-terminal-shell"
+
+[slurm]
+job_name = "jupyterhub-singleuser"
+log_path = "{{homedir}}/.jupyterhub-slurm-%j.log"
+working_directory = "{{homedir}}"
+nodes = "1"
+ntasks = "1"
+export = "{{keepvars}}"
+get_user_env = true
+
+# Do not set a Slurm runtime limit here. If the cluster has DefaultTime or
+# MaxTime configured, those Slurm-side limits may still apply.
+
+[[profiles]]
+display_name = "CPU: 4 cores, 8 GB memory"
+key = "cpu-4c-8g"
+# Leave this empty to use Slurm's default partition. If your cluster requires a
+# partition, replace it with a real value from `sinfo`, for example "cpu".
+partition = ""
+cpus = "4"
+memory = "8G"
+gres = ""
+# Add site-specific Slurm options here, for example:
+# options = ["--account=<account>", "--qos=<qos>"]
+options = []
+
+[[profiles]]
+display_name = "GPU: 1 GPU, 4 cores, 8 GB memory"
+key = "gpu-1-4c-8g"
+# Leave this empty to use Slurm's default partition. If your cluster has a GPU
+# partition, replace it with a real value from `sinfo`, for example "gpu".
+partition = ""
+cpus = "4"
+memory = "8G"
+# Change this if the cluster uses a different GRES name, for example
+# "gpu:a100:1", "gpu:rtx6000:1", or another site-specific value.
+gres = "gpu:1"
+options = []
