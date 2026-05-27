@@ -1,0 +1,11 @@
+venv/
+logs/*
+!logs/.gitkeep
+state/*
+!state/.gitkeep
+*.log
+*.sqlite
+*.sqlite-*
+__pycache__/
+*.pyc
+jupyterhub_cookie_secret
