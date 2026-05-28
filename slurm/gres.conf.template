@@ -1,0 +1,9 @@
+# Generic Resource (GRES) configuration for NVIDIA GPUs.
+#
+# This intentionally uses the generic name "gpu" so jobs can request:
+#   --gres=gpu:1
+#
+# The File pattern is generated from nvidia-smi -L GPU count. It does not assume
+# a specific model such as A100.
+
+NodeName=@NODE_NAME@ Name=gpu File=@GPU_FILE_PATTERN@

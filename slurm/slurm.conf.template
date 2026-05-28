@@ -1,0 +1,59 @@
+# Single-node Slurm configuration for lab-gpu-server.
+#
+# This file is generated from slurm/slurm.conf.template by:
+#   scripts/generate-slurm-config-single-node.sh
+#
+# It favors a small, understandable Ubuntu single-node setup:
+#   - one host acts as both slurmctld controller and slurmd worker
+#   - one default partition named "gpu"
+#   - NVIDIA GPUs are exposed as generic GRES named "gpu"
+#   - task/cgroup enables CPU, memory, and device enforcement
+
+ClusterName=lab-gpu-server
+SlurmctldHost=@NODE_NAME@
+
+# Slurm user/log/state locations from Ubuntu packages.
+SlurmUser=slurm
+StateSaveLocation=/var/lib/slurm/slurmctld
+SlurmdSpoolDir=/var/lib/slurm/slurmd
+SlurmctldPidFile=/run/slurmctld.pid
+SlurmdPidFile=/run/slurmd.pid
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+
+# Use MUNGE for local Slurm authentication.
+AuthType=auth/munge
+
+# cgroup-based process tracking and task enforcement are required for useful
+# CPU/RAM/device isolation on a shared GPU server.
+ProctrackType=proctrack/cgroup
+TaskPlugin=task/cgroup
+
+# cons_tres tracks CPUs, memory, and GRES as consumable resources. This is the
+# usual choice when scheduling GPUs with --gres=gpu:N.
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core_Memory
+
+# Keep accounting minimal. Sites that already run slurmdbd should use their own
+# accounting configuration instead of this generated single-node file.
+AccountingStorageType=accounting_storage/none
+JobAcctGatherType=jobacct_gather/cgroup
+
+# Conservative scheduler defaults for a single machine.
+SchedulerType=sched/backfill
+ReturnToService=2
+SlurmctldTimeout=120
+SlurmdTimeout=300
+InactiveLimit=0
+KillWait=30
+MinJobAge=300
+Waittime=0
+
+# GPU support. Details are in /etc/slurm/gres.conf.
+GresTypes=gpu
+
+# Auto-detected local resources.
+NodeName=@NODE_NAME@ CPUs=@CPU_COUNT@ RealMemory=@REAL_MEMORY_MB@ Gres=gpu:@GPU_COUNT@ State=UNKNOWN
+
+# Default GPU partition used by JupyterHub profiles in this repository.
+PartitionName=gpu Nodes=@NODE_NAME@ Default=YES MaxTime=INFINITE State=UP

@@ -1,0 +1,13 @@
+# Slurm cgroup enforcement for a shared single-node GPU server.
+#
+# ConstrainCores limits jobs to allocated CPU cores.
+# ConstrainRAMSpace limits jobs to allocated memory.
+# ConstrainDevices hides GPUs/devices that were not allocated by GRES.
+#
+# Keep this file intentionally small. Slurm versions packaged by different
+# Ubuntu releases vary in optional cgroup.conf keys, but these constraint keys
+# are the important portable part for this setup.
+
+ConstrainCores=yes
+ConstrainRAMSpace=yes
+ConstrainDevices=yes
