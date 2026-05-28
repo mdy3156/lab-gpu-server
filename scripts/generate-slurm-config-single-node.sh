@@ -55,13 +55,12 @@ detect_gpu_count() {
   echo "${count}"
 }
 
-gpu_file_pattern() {
+generate_gres_lines() {
   local count="$1"
-  if [[ "${count}" -eq 1 ]]; then
-    echo "/dev/nvidia0"
-  else
-    echo "/dev/nvidia[0-$((count - 1))]"
-  fi
+  local index
+  for ((index = 0; index < count; index++)); do
+    echo "NodeName=${NODE_NAME} Name=gpu File=/dev/nvidia${index}"
+  done
 }
 
 render_template() {
@@ -75,8 +74,23 @@ render_template() {
     -e "s|@CPU_COUNT@|${CPU_COUNT}|g" \
     -e "s|@REAL_MEMORY_MB@|${REAL_MEMORY_MB}|g" \
     -e "s|@GPU_COUNT@|${GPU_COUNT}|g" \
-    -e "s|@GPU_FILE_PATTERN@|${GPU_FILE_PATTERN}|g" \
     "${template}" > "${output}"
+}
+
+render_gres_template() {
+  local template="$1"
+  local output="$2"
+  local lines
+
+  lines="$(generate_gres_lines "${GPU_COUNT}")"
+
+  # Replace the marker with one explicit File line per GPU. This is more
+  # compatible across Slurm versions than a bracket pattern such as
+  # /dev/nvidia[0-2].
+  awk -v lines="${lines}" '
+    $0 == "@GPU_GRES_LINES@" { print lines; next }
+    { print }
+  ' "${template}" > "${output}"
 }
 
 require_template "${TEMPLATE_DIR}/slurm.conf.template"
@@ -90,9 +104,11 @@ fi
 
 NODE_NAME="$(hostname -s)"
 CPU_COUNT="$(nproc --all)"
-REAL_MEMORY_MB="$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)"
+# Leave headroom below MemTotal so Slurm does not mark the node invalid if the
+# daemon observes slightly less available memory than /proc/meminfo reports.
+REAL_MEMORY_MB="$(awk '/^MemTotal:/ {print int(($2 / 1024) * 0.95)}' /proc/meminfo)"
 GPU_COUNT="$(detect_gpu_count)"
-GPU_FILE_PATTERN="$(gpu_file_pattern "${GPU_COUNT}")"
+GPU_GRES_LINES="$(generate_gres_lines "${GPU_COUNT}")"
 
 if [[ -z "${NODE_NAME}" || -z "${CPU_COUNT}" || -z "${REAL_MEMORY_MB}" ]]; then
   echo "ERROR: failed to detect hostname, CPU count, or memory." >&2
@@ -105,7 +121,8 @@ NodeName:   ${NODE_NAME}
 CPUs:       ${CPU_COUNT}
 Memory MB:  ${REAL_MEMORY_MB}
 GPUs:       ${GPU_COUNT}
-GPU files:  ${GPU_FILE_PATTERN}
+GPU files:
+${GPU_GRES_LINES}
 EOF
 
 echo
@@ -130,7 +147,7 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 echo
 echo "==> Rendering Slurm configuration files"
 render_template "${TEMPLATE_DIR}/slurm.conf.template" "${TMP_DIR}/slurm.conf"
-render_template "${TEMPLATE_DIR}/gres.conf.template" "${TMP_DIR}/gres.conf"
+render_gres_template "${TEMPLATE_DIR}/gres.conf.template" "${TMP_DIR}/gres.conf"
 render_template "${TEMPLATE_DIR}/cgroup.conf.template" "${TMP_DIR}/cgroup.conf"
 
 install -m 0644 "${TMP_DIR}/slurm.conf" "${SLURM_CONF}"

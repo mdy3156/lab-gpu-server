@@ -69,7 +69,7 @@ sudo bash scripts/generate-slurm-config-single-node.sh
 
 - `NodeName`: `hostname -s`
 - CPU 数: `nproc --all`
-- メモリ MB: `/proc/meminfo`
+- メモリ MB: `/proc/meminfo` の `MemTotal` の 95%
 - GPU 枚数: `nvidia-smi -L`
 
 生成される partition 名は `gpu` です。
@@ -82,6 +82,14 @@ node 行には検出した CPU、メモリ、GPU 枚数が入ります。
 
 ```text
 NodeName=<hostname> CPUs=<detected> RealMemory=<detected> Gres=gpu:<detected_gpu_count> State=UNKNOWN
+```
+
+`gres.conf` は GPU ごとに明示的な行を生成します。GPU 3 枚なら次の形です。
+
+```text
+NodeName=<hostname> Name=gpu File=/dev/nvidia0
+NodeName=<hostname> Name=gpu File=/dev/nvidia1
+NodeName=<hostname> Name=gpu File=/dev/nvidia2
 ```
 
 cgroup 設定では次を有効にします。
@@ -168,8 +176,9 @@ sudo journalctl -u slurmctld -u slurmd --no-pager -n 200
 sudo systemctl status slurmctld slurmd --no-pager
 ```
 
+生成時点で `RealMemory` は `MemTotal` の 95% にしています。それでも
 `RealMemory` が実際より大きいと node が invalid になることがあります。その場合は
-`/etc/slurm/slurm.conf` の `RealMemory` を少し小さくしてから再起動します。
+`/etc/slurm/slurm.conf` の `RealMemory` をさらに少し小さくしてから再起動します。
 
 ```bash
 sudo systemctl restart slurmctld slurmd

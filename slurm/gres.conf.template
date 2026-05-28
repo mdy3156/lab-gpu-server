@@ -3,7 +3,8 @@
 # This intentionally uses the generic name "gpu" so jobs can request:
 #   --gres=gpu:1
 #
-# The File pattern is generated from nvidia-smi -L GPU count. It does not assume
-# a specific model such as A100.
+# One explicit File line is generated per GPU from the nvidia-smi -L GPU count.
+# This avoids depending on bracket-pattern handling in a particular Slurm
+# version and does not assume a specific model such as A100.
 
-NodeName=@NODE_NAME@ Name=gpu File=@GPU_FILE_PATTERN@
+@GPU_GRES_LINES@
